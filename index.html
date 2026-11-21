@@ -1,0 +1,268 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>가위바위보 룰렛</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Malgun Gothic", sans-serif;
+    background: linear-gradient(135deg, #fff4df, #fce4ec);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 25px 15px;
+    text-align: center;
+}
+
+h1 {
+    font-size: clamp(32px, 6vw, 52px);
+    color: #333;
+    margin: 0 0 15px;
+}
+
+#result {
+    font-size: clamp(36px, 8vw, 64px);
+    font-weight: 900;
+    color: #e65100;
+    min-height: 85px;
+    margin-bottom: 10px;
+}
+
+.wheel-container {
+    position: relative;
+    width: min(78vw, 430px);
+    height: min(78vw, 430px);
+    margin: 15px auto 30px;
+}
+
+canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.pointer {
+    position: absolute;
+    top: -17px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 25px solid transparent;
+    border-right: 25px solid transparent;
+    border-top: 45px solid #333;
+    z-index: 2;
+}
+
+button {
+    width: min(85vw, 360px);
+    padding: 22px 15px;
+    margin: 9px 0;
+    border: none;
+    border-radius: 20px;
+    font-size: clamp(25px, 5vw, 34px);
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.15);
+    transition: transform 0.1s;
+}
+
+button:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 rgba(0,0,0,0.15);
+}
+
+#spinBtn {
+    background: #ff7043;
+    color: white;
+}
+
+#resetBtn {
+    background: #455a64;
+    color: white;
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.guide {
+    font-size: 19px;
+    color: #555;
+    margin-top: 18px;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>✂️ 가위 바위 보 ✊</h1>
+
+<div id="result" aria-live="polite">룰렛을 돌려 보세요!</div>
+
+<div class="wheel-container">
+    <div class="pointer"></div>
+    <canvas id="wheel" width="600" height="600"></canvas>
+</div>
+
+<button id="spinBtn" onclick="spinWheel()">🎯 돌리기</button>
+<button id="resetBtn" onclick="resetWheel()">↻ 다시 돌리기</button>
+
+<div class="guide">버튼을 누르면 룰렛이 돌아갑니다!</div>
+
+<script>
+const canvas = document.getElementById("wheel");
+const ctx = canvas.getContext("2d");
+
+const resultText = document.getElementById("result");
+const spinBtn = document.getElementById("spinBtn");
+
+const items = [
+    { name: "가위", emoji: "✌️", color: "#FFCA28" },
+    { name: "바위", emoji: "✊", color: "#66BB6A" },
+    { name: "보", emoji: "✋", color: "#42A5F5" }
+];
+
+const center = 300;
+const radius = 285;
+const slice = Math.PI * 2 / 3;
+
+let rotation = 0;
+let spinning = false;
+
+function drawWheel() {
+    ctx.clearRect(0, 0, 600, 600);
+
+    items.forEach((item, i) => {
+        const start = -Math.PI / 2 + rotation + i * slice;
+        const end = start + slice;
+
+        // 원판 색상
+        ctx.beginPath();
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, radius, start, end);
+        ctx.closePath();
+        ctx.fillStyle = item.color;
+        ctx.fill();
+
+        ctx.lineWidth = 8;
+        ctx.strokeStyle = "#ffffff";
+        ctx.stroke();
+
+        // 글자와 이모지
+        const middle = start + slice / 2;
+        const textX = center + Math.cos(middle) * 170;
+        const textY = center + Math.sin(middle) * 170;
+
+        ctx.save();
+        ctx.translate(textX, textY);
+
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        ctx.font = "bold 76px sans-serif";
+        ctx.fillStyle = "#222";
+        ctx.fillText(item.emoji, 0, -20);
+
+        ctx.font = "bold 48px sans-serif";
+        ctx.fillText(item.name, 0, 55);
+
+        ctx.restore();
+    });
+
+    // 가운데 원
+    ctx.beginPath();
+    ctx.arc(center, center, 35, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = "#333";
+    ctx.stroke();
+}
+
+function getResult() {
+    // 원판의 맨 위를 가리키는 칸 계산
+    let angle = ((-rotation % (Math.PI * 2)) + Math.PI * 2)
+                % (Math.PI * 2);
+
+    const index = Math.floor(angle / slice);
+
+    return items[index];
+}
+
+function spinWheel() {
+    if (spinning) return;
+
+    spinning = true;
+    spinBtn.disabled = true;
+    resultText.textContent = "빙글빙글 돌아갑니다!";
+
+    const startRotation = rotation;
+
+    // 여러 바퀴 회전 + 무작위 최종 위치
+    const extraTurns = 5 + Math.floor(Math.random() * 4);
+    const randomAngle = Math.random() * Math.PI * 2;
+
+    const targetRotation =
+        startRotation + extraTurns * Math.PI * 2 + randomAngle;
+
+    const duration = 5000;
+    const startTime = performance.now();
+
+    function animate(now) {
+        const elapsed = now - startTime;
+        let progress = Math.min(elapsed / duration, 1);
+
+        // 부드럽게 감속하는 효과
+        const ease = 1 - Math.pow(1 - progress, 4);
+
+        rotation = startRotation +
+            (targetRotation - startRotation) * ease;
+
+        drawWheel();
+
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        } else {
+            rotation = targetRotation % (Math.PI * 2);
+            drawWheel();
+
+            const winner = getResult();
+
+            resultText.textContent =
+                winner.emoji + " " + winner.name + "!";
+
+            spinning = false;
+            spinBtn.disabled = false;
+        }
+    }
+
+    requestAnimationFrame(animate);
+}
+
+function resetWheel() {
+    if (spinning) return;
+
+    rotation = 0;
+    drawWheel();
+    resultText.textContent = "룰렛을 돌려 보세요!";
+}
+
+drawWheel();
+
+</script>
+
+</body>
+</html>
